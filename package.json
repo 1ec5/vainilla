@@ -1,0 +1,22 @@
+{
+    "name": "vainilla",
+    "version": "0.0.1",
+    "main": "index.js",
+    "author": "Minh Nguyen <mxn@1ec5.org> (http://www.1ec5.org/)",
+    "license": "MIT",
+    "keywords": [
+        "openstreetmap",
+        "osm"
+    ],
+    "homepage": "https://github.com/1ec5/vainilla/",
+    "bugs": "https://github.com/1ec5/vainilla/issues/",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/1ec5/vainilla.git"
+    },
+    "dependencies": {
+        "@turf/turf": "^5.0.0",
+        "lodash": "^4.17.4",
+        "osmium": "^0.5.6"
+    }
+}
