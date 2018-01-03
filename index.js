@@ -34,12 +34,14 @@ function getTagsForProgression(tag, way, progression, laneCount) {
 }
 
 /**
- * Returns the number of lanes in the given way going in a particular direction.
+ * Returns the number of lanes in the given way.
  *
  * @param way {Object} The way on which to count the lanes.
  * @param progression {Number} A positive number for the forward direction or a
- *  negative number for the backward direction.
- * @returns {Number} The number of lanes in one direction.
+ *  negative number for the backward direction. Omit this parameter to count all
+ *  the lanes regardless of progression.
+ * @returns {Number} The number of lanes in one direction, or the number of
+ *  lanes in every direction if `progression` is omitted.
  */
 function getLaneCount(way, progression) {
     let tags = way.tags();
