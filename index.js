@@ -43,6 +43,22 @@ function getTagsForProgression(tag, way, progression, laneCount) {
  */
 function getLaneCount(way, progression) {
     let tags = way.tags();
+    if (!progression) {
+        if (tags.lanes) {
+            return parseInt(tags.lanes);
+        }
+        if (tags.highway === "service") {
+            return 1;
+        }
+        let laneCount = 0;
+        if (tags.oneway !== "-1") {
+            laneCount += getLaneCount(way, 1);
+        }
+        if (tags.oneway !== "yes") {
+            laneCount += getLaneCount(way, -1);
+        }
+        return laneCount;
+    }
     let progressions = {
         forward: tags.oneway !== "-1",
         backward: tags.oneway !== "yes"
@@ -100,33 +116,17 @@ handler.on("way", way => {
         publicCenterlineLength += length;
     }
     
-    let progressions = {
-        forward: tags.oneway !== "-1",
-        backward: tags.oneway !== "yes"
-    };
-    if (!!progressions.forward + !!progressions.backward === 1 && ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(tags.highway)) {
+    if ((tags.oneway === "yes" || tags.oneway === "-1") && ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(tags.highway)) {
         onewayCenterlineLength += length;
         if (isPublic) {
             onewayPublicCenterlineLength += length;
         }
     }
     
-    if (progressions.forward && (tags.highway !== "service" || tags.lanes)) {
-        let forwardLaneLength = length * getLaneCount(way, 1);
-        laneLength += forwardLaneLength;
-        if (isPublic) {
-            publicLaneLength += forwardLaneLength;
-        }
-    }
-    if (progressions.backward && (tags.highway !== "service" || tags.lanes)) {
-        let backwardLaneLength = length * getLaneCount(way, -1);
-        laneLength += backwardLaneLength;
-        if (isPublic) {
-            publicLaneLength += backwardLaneLength;
-        }
-    }
-    if (tags.highway === "service" && !tags.lanes) {
-        laneLength += length;
+    let wayLaneLength = length * getLaneCount(way);
+    laneLength += wayLaneLength;
+    if (isPublic) {
+        publicLaneLength += wayLaneLength;
     }
 });
 osmium.apply(reader, location_handler, handler);
