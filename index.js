@@ -62,10 +62,6 @@ function getLaneCount(way, progression) {
         }
         return laneCount;
     }
-    let progressions = {
-        forward: tags.oneway !== "-1",
-        backward: tags.oneway !== "yes"
-    };
     let direction = progression > 0 ? "forward" : "backward";
     let laneCount = parseInt(tags["lanes:" + direction]);
     let turnLanes = getTagsForProgression("turn", way, progression);
@@ -75,7 +71,7 @@ function getLaneCount(way, progression) {
     }
     if (!laneCount) {
         laneCount = parseInt(tags.lanes);
-        if (progressions.forward && progressions.backward) {
+        if (!tags.oneway || tags.oneway === "no") {
             laneCount = Math.floor(laneCount / 2);
         }
     }
@@ -103,6 +99,7 @@ let interstateCenterlineLength = 0;
 let interstateLaneLength = 0;
 let freewayCenterlineLength = 0;
 let freewayLaneLength = 0;
+let turnLaneLength = 0;
 
 let alleyLength = 0;
 let drivewayLength = 0;
@@ -175,6 +172,21 @@ handler.on("way", way => {
         freewayLaneLength += wayLaneLength;
     }
     
+    let isTurnChannel = (tags.turn || (tags.lanes === "1") || (!tags.lanes)) && isOneWay &&
+        (tags.highway === "service" || tags.highway.includes("_link"));
+    if (!isTurnChannel) {
+        if (tags.oneway !== "-1") {
+            let turnLanes = getTagsForProgression("turn", way, 1, getLaneCount(way, 1));
+            let turnLaneCount = turnLanes ? turnLanes.split("|").filter(lane => lane && lane !== "through" && !lane.includes("merge")).length : 0;
+            turnLaneLength += turnLaneCount * length;
+        }
+        if (tags.oneway !== "yes") {
+            let turnLanes = getTagsForProgression("turn", way, -1, getLaneCount(way, -1));
+            let turnLaneCount = turnLanes ? turnLanes.split("|").filter(lane => lane && lane !== "through" && !lane.includes("merge")).length : 0;
+            turnLaneLength += turnLaneCount * length;
+        }
+    }
+    
     if (isOneWay) {
         if (tags.cycleway === "lane" || tags["cycleway:left"] === "lane" || tags["cycleway:right"] === "lane") {
             bikeLaneLength += length;
@@ -217,5 +229,6 @@ console.log("All roadways:");
 console.log(`\tFrom ${centerlineLength - onewayCenterlineLength / 2} to ${centerlineLength} centerline meters`);
 console.log(`\t${laneLength} lane meters`);
 console.log("Attributes:");
+console.log(`\t${turnLaneLength} meters of turn lanes`);
 console.log(`\t${bikeLaneLength} meters of bike lanes`);
 console.log(`\t${sharrowLength} meters of sharrows`);
