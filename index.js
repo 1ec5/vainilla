@@ -104,6 +104,11 @@ let interstateLaneLength = 0;
 let freewayCenterlineLength = 0;
 let freewayLaneLength = 0;
 
+let alleyLength = 0;
+let drivewayLength = 0;
+let parkingAisleLength = 0;
+let driveThroughLength = 0;
+
 handler.on("way", way => {
     let coords = way.geojson().coordinates;
     let line = turf.lineString(coords);
@@ -137,6 +142,24 @@ handler.on("way", way => {
         }
     }
     
+    if (tags.highway === "service") {
+        switch (tags.service) {
+            case "alley":
+                alleyLength += length;
+                break;
+            case "driveway":
+                drivewayLength += length;
+                break;
+            case "parking_aisle":
+                parkingAisleLength += length;
+                break;
+            case "drive-through":
+            case "drive_through":
+                driveThroughLength += length;
+                break;
+        }
+    }
+    
     let wayLaneLength = length * getLaneCount(way);
     laneLength += wayLaneLength;
     if (isPublic) {
@@ -159,6 +182,11 @@ console.log(`\t${freewayLaneLength} lane meters`);
 console.log("Public roadways:");
 console.log(`\tFrom ${publicCenterlineLength - onewayPublicCenterlineLength / 2} to ${publicCenterlineLength} centerline meters`);
 console.log(`\t${publicLaneLength} lane meters`);
+console.log("Service roads:");
+console.log(`\t${alleyLength} meters of alleys`);
+console.log(`\t${drivewayLength} meters of driveways`);
+console.log(`\t${parkingAisleLength} meters of parking aisles`);
+console.log(`\t${driveThroughLength} meters of drive-throughs`);
 console.log("All roadways:");
 console.log(`\tFrom ${centerlineLength - onewayCenterlineLength / 2} to ${centerlineLength} centerline meters`);
 console.log(`\t${laneLength} lane meters`);
