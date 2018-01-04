@@ -101,6 +101,8 @@ let onewayPublicCenterlineLength = 0;
 let publicLaneLength = 0;
 let interstateCenterlineLength = 0;
 let interstateLaneLength = 0;
+let freewayCenterlineLength = 0;
+let freewayLaneLength = 0;
 
 handler.on("way", way => {
     let coords = way.geojson().coordinates;
@@ -116,13 +118,16 @@ handler.on("way", way => {
     
     let tags = way.tags();
     let isPublic = tags.highway !== "service" && (!tags.access || ["yes", "destination", "designated"].includes(tags.access));
-    let isInterstate = tags.ref && tags.ref.startsWith("I ");
+    let isInterstate = tags.ref && tags.ref.startsWith("I ") && tags.highway !== "motorway_link";
+    let isFreeway = tags.highway === "motorway";
     centerlineLength += length;
     if (isPublic) {
         publicCenterlineLength += length;
     }
     if (isInterstate) {
         interstateCenterlineLength += length;
+    } else if (isFreeway) {
+        freewayCenterlineLength += length;
     }
     
     if ((tags.oneway === "yes" || tags.oneway === "-1") && ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(tags.highway)) {
@@ -139,6 +144,8 @@ handler.on("way", way => {
     }
     if (isInterstate) {
         interstateLaneLength += wayLaneLength;
+    } else if (isFreeway) {
+        freewayLaneLength += wayLaneLength;
     }
 });
 osmium.apply(reader, location_handler, handler);
@@ -146,6 +153,9 @@ console.log("----");
 console.log("Interstates:");
 console.log(`\t${interstateCenterlineLength / 2} centerline meters`);
 console.log(`\t${interstateLaneLength} lane meters`);
+console.log("Other freeways and expressways:");
+console.log(`\t${freewayCenterlineLength / 2} centerline meters`);
+console.log(`\t${freewayLaneLength} lane meters`);
 console.log("Public roadways:");
 console.log(`\tFrom ${publicCenterlineLength - onewayPublicCenterlineLength / 2} to ${publicCenterlineLength} centerline meters`);
 console.log(`\t${publicLaneLength} lane meters`);
