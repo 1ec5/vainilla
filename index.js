@@ -109,6 +109,9 @@ let drivewayLength = 0;
 let parkingAisleLength = 0;
 let driveThroughLength = 0;
 
+let bikeLaneLength = 0;
+let sharrowLength = 0;
+
 handler.on("way", way => {
     let coords = way.geojson().coordinates;
     let line = turf.lineString(coords);
@@ -135,7 +138,8 @@ handler.on("way", way => {
         freewayCenterlineLength += length;
     }
     
-    if ((tags.oneway === "yes" || tags.oneway === "-1") && ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(tags.highway)) {
+    let isOneWay = tags.oneway === "yes" || tags.oneway === "-1";
+    if (isOneWay && ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(tags.highway)) {
         onewayCenterlineLength += length;
         if (isPublic) {
             onewayPublicCenterlineLength += length;
@@ -170,6 +174,28 @@ handler.on("way", way => {
     } else if (isFreeway) {
         freewayLaneLength += wayLaneLength;
     }
+    
+    if (isOneWay) {
+        if (tags.cycleway === "lane" || tags["cycleway:left"] === "lane" || tags["cycleway:right"] === "lane") {
+            bikeLaneLength += length;
+        }
+        if (tags.cycleway === "shared_lane" || tags["cycleway:left"] === "shared_lane" || tags["cycleway:right"] === "shared_lane") {
+            sharrowLength += length;
+        }
+    } else {
+        if (tags.cycleway === "lane" || tags["cycleway:left"] === "lane") {
+            bikeLaneLength += length;
+        }
+        if (tags.cycleway === "lane" || tags["cycleway:right"] === "lane") {
+            bikeLaneLength += length;
+        }
+        if (tags.cycleway === "shared_lane" || tags["cycleway:left"] === "shared_lane") {
+            sharrowLength += length;
+        }
+        if (tags.cycleway === "shared_lane" || tags["cycleway:right"] === "shared_lane") {
+            sharrowLength += length;
+        }
+    }
 });
 osmium.apply(reader, location_handler, handler);
 console.log("----");
@@ -190,3 +216,6 @@ console.log(`\t${driveThroughLength} meters of drive-throughs`);
 console.log("All roadways:");
 console.log(`\tFrom ${centerlineLength - onewayCenterlineLength / 2} to ${centerlineLength} centerline meters`);
 console.log(`\t${laneLength} lane meters`);
+console.log("Attributes:");
+console.log(`\t${bikeLaneLength} meters of bike lanes`);
+console.log(`\t${sharrowLength} meters of sharrows`);
