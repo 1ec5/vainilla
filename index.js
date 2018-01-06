@@ -84,9 +84,7 @@ if (!input) {
     return;
 }
 
-let reader = new osmium.Reader(input, { node: true, way: true });
 let handler = new osmium.Handler();
-let location_handler = new osmium.LocationHandler();
 
 let roadCount = 0;
 let centerlineLength = 0;
@@ -110,18 +108,16 @@ let bikeLaneLength = 0;
 let sharrowLength = 0;
 
 handler.on("way", way => {
-    let coords = way.geojson().coordinates;
-    let line = turf.lineString(coords);
-    let length = turf.length(line, {
+    let tags = way.tags();
+    if (!tags.highway && !tags.cycleway && !tags.footway) {
+        return;
+    }
+    
+    let feature = way.geojson();
+    let length = turf.length(feature, {
         units: "meters"
     });
     
-    roadCount++;
-    if (Math.floor(roadCount / 100000) > Math.floor((roadCount - 1) / 100000)) {
-        console.log(`${roadCount} ways spanning ${centerlineLength} meters`);
-    }
-    
-    let tags = way.tags();
     let isPublic = tags.highway !== "service" && (!tags.access || ["yes", "destination", "designated"].includes(tags.access));
     let isInterstate = tags.ref && tags.ref.startsWith("I ") && tags.highway !== "motorway_link";
     let isFreeway = tags.highway === "motorway";
@@ -133,6 +129,11 @@ handler.on("way", way => {
         interstateCenterlineLength += length;
     } else if (isFreeway) {
         freewayCenterlineLength += length;
+    }
+    
+    roadCount++;
+    if (Math.floor(roadCount / 100000) > Math.floor((roadCount - 1) / 100000)) {
+        console.log(`${roadCount} ways spanning ${centerlineLength} meters`);
     }
     
     let isOneWay = tags.oneway === "yes" || tags.oneway === "-1";
@@ -209,7 +210,44 @@ handler.on("way", way => {
         }
     }
 });
-osmium.apply(reader, location_handler, handler);
+
+let buildingCount = 0;
+let buildingCoverArea = 0;
+
+handler.on("area", area => {
+    if (!area.tags("building")) {
+        return;
+    }
+    let feature;
+    try {
+        feature = area.geojson();
+    } catch (e) {
+        console.warn("Degenerate area:", area);
+        return;
+    }
+    let squareMeters = turf.area(feature, {
+        units: "meters"
+    });
+    
+    buildingCoverArea += squareMeters;
+    
+    buildingCount++;
+    if (Math.floor(buildingCount / 100000) > Math.floor((buildingCount - 1) / 100000)) {
+        console.log(`${buildingCount} areas covering ${buildingCoverArea} square meters`);
+    }
+});
+
+let file = new osmium.File(input);
+let mp = new osmium.MultipolygonCollector();
+let reader = new osmium.BasicReader(file, { node: false, way: true, relation: true });
+mp.read_relations(reader);
+reader.close();
+
+reader = new osmium.Reader(file);
+let locationHandler = new osmium.LocationHandler();
+osmium.apply(reader, locationHandler, mp.handler(handler));
+reader.close();
+
 console.log("----");
 console.log("Interstates:");
 console.log(`\t${interstateCenterlineLength / 2} centerline meters`);
@@ -232,3 +270,7 @@ console.log("Attributes:");
 console.log(`\t${turnLaneLength} meters of turn lanes`);
 console.log(`\t${bikeLaneLength} meters of bike lanes`);
 console.log(`\t${sharrowLength} meters of sharrows`);
+
+console.log("----");
+console.log("Buildings:");
+console.log(`\t${buildingCoverArea} square meters of buildings`);

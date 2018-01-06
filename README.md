@@ -24,7 +24,7 @@ Baking statistics is easy:
    node index.js roads.osm.pbf
    ```
 
-Wait until you see a golden brown crust of centerline and lane lengths in meters. Let sit for a few moments, then serve on the appropriate OpenStreetMap Wiki page ([example](https://wiki.openstreetmap.org/wiki/Ohio/Statistics)).
+Wait until you see a golden brown crust of centerline and lane lengths in meters. Let sit for a few moments, top with a building acreage, then serve on the appropriate OpenStreetMap Wiki page ([example](https://wiki.openstreetmap.org/wiki/Ohio/Statistics)).
 
 ## About the name
 
