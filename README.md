@@ -13,7 +13,7 @@ You’ll need these ingredients:
 Baking statistics is easy:
 
 1. Clone this repository and run `npm install` to install Vainilla’s dependencies.
-1. Filter the regional extract down to just roads and their nodes:
+1. Filter the regional extract down to just the nodes, ways, and relations needed to represent roads and buildings:
    ```bash
    osmium tags-filter region.osm.pbf \
      'w/highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary,secondary_link,tertiary,tertiary_link,unclassified,residential,living_street,service,bus_guideway,escape,raceway,road wr/building!=no' \
