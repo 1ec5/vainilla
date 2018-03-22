@@ -13,15 +13,9 @@ You’ll need these ingredients:
 Baking statistics is easy:
 
 1. Clone this repository and run `npm install` to install Vainilla’s dependencies.
-1. Filter the regional extract down to just the nodes, ways, and relations needed to represent roads and buildings:
-   ```bash
-   osmium tags-filter region.osm.pbf \
-     'w/highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary,secondary_link,tertiary,tertiary_link,unclassified,residential,living_street,service,bus_guideway,escape,raceway,road wr/building!=no' \
-	 -o roads-buildings.osm.pbf
-   ```
 1. Run Vainilla on the filtered extract:
    ```
-   node index.js roads-buildings.osm.pbf
+   node index.js region.osm.pbf
    ```
 
 Wait until you see a golden brown crust of centerline and lane lengths in meters. Let sit for a few moments, top with a building acreage, then serve on the appropriate OpenStreetMap Wiki page ([example](https://wiki.openstreetmap.org/wiki/Ohio/Statistics)).

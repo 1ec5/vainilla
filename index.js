@@ -86,6 +86,51 @@ if (!input) {
 
 let handler = new osmium.Handler();
 
+let buildingCount = 0;
+let buildingCoverArea = 0;
+
+handler.on("area", area => {
+    let building = area.tags("building");
+    if (!building || building === "no") {
+        return;
+    }
+    let feature;
+    try {
+        feature = area.geojson();
+    } catch (e) {
+        console.warn("Degenerate area:", area);
+        return;
+    }
+    let squareMeters = turf.area(feature, {
+        units: "meters"
+    });
+    
+    buildingCoverArea += squareMeters;
+    
+    buildingCount++;
+    if (Math.floor(buildingCount / 100000) > Math.floor((buildingCount - 1) / 100000)) {
+        console.log(`${buildingCount} areas covering ${buildingCoverArea} square meters`);
+    }
+});
+
+let file = new osmium.File(input);
+let reader = new osmium.BasicReader(file);
+let mp = new osmium.MultipolygonCollector();
+mp.read_relations(reader);
+reader.close();
+
+reader = new osmium.Reader(file);
+let locationHandler = new osmium.LocationHandler();
+osmium.apply(reader, locationHandler, mp.handler(handler));
+reader.close();
+
+let hallwayLength = 0;
+let footPathLength = 0;
+let stairLength = 0;
+let sidewalkLength = 0;
+let bikePathLength = 0;
+let crossingLength = 0;
+
 let roadCount = 0;
 let centerlineLength = 0;
 let onewayCenterlineLength = 0;
@@ -97,7 +142,6 @@ let interstateCenterlineLength = 0;
 let interstateLaneLength = 0;
 let freewayCenterlineLength = 0;
 let freewayLaneLength = 0;
-let turnLaneLength = 0;
 
 let alleyLength = 0;
 let drivewayLength = 0;
@@ -106,18 +150,72 @@ let driveThroughLength = 0;
 
 let bikeLaneLength = 0;
 let sharrowLength = 0;
+let turnLaneLength = 0;
+let maximumSpeedLimitLength = 0;
 
-handler.on("way", way => {
-    let tags = way.tags();
-    if (!tags.highway && !tags.cycleway && !tags.footway) {
-        return;
-    }
-    
+let lengthsByRoadClass = {};
+let speedLimitLengthsByRoadClass = {};
+
+reader = new osmium.Reader(file, locationHandler, { node: true, way: true, relation: false });
+let filter = new osmium.Filter();
+filter.with_ways("highway", "motorway");
+filter.with_ways("highway", "motorway_link");
+filter.with_ways("highway", "trunk");
+filter.with_ways("highway", "trunk_link");
+filter.with_ways("highway", "primary");
+filter.with_ways("highway", "primary_link");
+filter.with_ways("highway", "secondary");
+filter.with_ways("highway", "secondary_link");
+filter.with_ways("highway", "tertiary");
+filter.with_ways("highway", "tertiary_link");
+filter.with_ways("highway", "unclassified");
+filter.with_ways("highway", "residential");
+filter.with_ways("highway", "living_street");
+filter.with_ways("highway", "service");
+filter.with_ways("highway", "bus_guideway");
+filter.with_ways("highway", "escape");
+filter.with_ways("highway", "raceway");
+filter.with_ways("highway", "road");
+filter.with_ways("highway", "corridor");
+filter.with_ways("highway", "pedestrian");
+filter.with_ways("highway", "footway");
+filter.with_ways("highway", "steps");
+filter.with_ways("highway", "cycleway");
+
+let stream = new osmium.Stream(reader, filter);
+stream.on("data", way => {
     let feature = way.geojson();
     let length = turf.length(feature, {
         units: "meters"
     });
     
+    switch (way.tags("highway")) {
+        case "corridor":
+            hallwayLength += length;
+            return;
+        case "pedestrian":
+        case "footway":
+            switch (way.tags("footway")) {
+                case "crossing":
+                    crossingLength += length;
+                    return;
+                case "sidewalk":
+                    sidewalkLength += length;
+            }
+            footPathLength += length;
+            return;
+        case "steps":
+            stairLength += length;
+            return;
+        case "cycleway":
+            bikePathLength += length;
+            if (way.tags("cycleway") === "crossing" || way.tags("footway") === "crossing") {
+                crossingLength += length;
+            }
+            return;
+    }
+    
+    let tags = way.tags();
     let isPublic = tags.highway !== "service" && (!tags.access || ["yes", "destination", "designated"].includes(tags.access));
     let isInterstate = tags.ref && tags.ref.startsWith("I ") && tags.highway !== "motorway_link";
     let isFreeway = tags.highway === "motorway";
@@ -209,68 +307,61 @@ handler.on("way", way => {
             sharrowLength += length;
         }
     }
-});
-
-let buildingCount = 0;
-let buildingCoverArea = 0;
-
-handler.on("area", area => {
-    if (!area.tags("building")) {
-        return;
-    }
-    let feature;
-    try {
-        feature = area.geojson();
-    } catch (e) {
-        console.warn("Degenerate area:", area);
-        return;
-    }
-    let squareMeters = turf.area(feature, {
-        units: "meters"
-    });
     
-    buildingCoverArea += squareMeters;
+    if (!(tags.highway in lengthsByRoadClass)) {
+        lengthsByRoadClass[tags.highway] = 0;
+    }
+    lengthsByRoadClass[tags.highway] += length;
     
-    buildingCount++;
-    if (Math.floor(buildingCount / 100000) > Math.floor((buildingCount - 1) / 100000)) {
-        console.log(`${buildingCount} areas covering ${buildingCoverArea} square meters`);
+    if (tags.maxspeed || tags["maxspeed:advisory"] ||
+        tags["maxspeed:forward"] || tags["maxspeed:advisory:forward"] ||
+        tags["maxspeed:backward"] || tags["maxspeed:advisory:backward"]) {
+        maximumSpeedLimitLength += length;
+        if (!(tags.highway in speedLimitLengthsByRoadClass)) {
+            speedLimitLengthsByRoadClass[tags.highway] = 0;
+        }
+        speedLimitLengthsByRoadClass[tags.highway] += length;
     }
 });
-
-let file = new osmium.File(input);
-let mp = new osmium.MultipolygonCollector();
-let reader = new osmium.BasicReader(file, { node: false, way: true, relation: true });
-mp.read_relations(reader);
-reader.close();
-
-reader = new osmium.Reader(file);
-let locationHandler = new osmium.LocationHandler();
-osmium.apply(reader, locationHandler, mp.handler(handler));
-reader.close();
-
-console.log("----");
-console.log("Interstates:");
-console.log(`\t${interstateCenterlineLength / 2} centerline meters`);
-console.log(`\t${interstateLaneLength} lane meters`);
-console.log("Other freeways and expressways:");
-console.log(`\t${freewayCenterlineLength / 2} centerline meters`);
-console.log(`\t${freewayLaneLength} lane meters`);
-console.log("Public roadways:");
-console.log(`\tFrom ${publicCenterlineLength - onewayPublicCenterlineLength / 2} to ${publicCenterlineLength} centerline meters`);
-console.log(`\t${publicLaneLength} lane meters`);
-console.log("Service roads:");
-console.log(`\t${alleyLength} meters of alleys`);
-console.log(`\t${drivewayLength} meters of driveways`);
-console.log(`\t${parkingAisleLength} meters of parking aisles`);
-console.log(`\t${driveThroughLength} meters of drive-throughs`);
-console.log("All roadways:");
-console.log(`\tFrom ${centerlineLength - onewayCenterlineLength / 2} to ${centerlineLength} centerline meters`);
-console.log(`\t${laneLength} lane meters`);
-console.log("Attributes:");
-console.log(`\t${turnLaneLength} meters of turn lanes`);
-console.log(`\t${bikeLaneLength} meters of bike lanes`);
-console.log(`\t${sharrowLength} meters of sharrows`);
-
-console.log("----");
-console.log("Buildings:");
-console.log(`\t${buildingCoverArea} square meters of buildings`);
+stream.on("end", () => {
+    console.log("----");
+    
+    console.log("Buildings:");
+    console.log(`\t${buildingCount} buildings covering ${buildingCoverArea} square meters`);
+    
+    console.log("----");
+    
+    console.log("Interstates:");
+    console.log(`\t${interstateCenterlineLength / 2} centerline meters`);
+    console.log(`\t${interstateLaneLength} lane meters`);
+    console.log("Other freeways and expressways:");
+    console.log(`\t${freewayCenterlineLength / 2} centerline meters`);
+    console.log(`\t${freewayLaneLength} lane meters`);
+    console.log("Public roadways:");
+    console.log(`\tFrom ${publicCenterlineLength - onewayPublicCenterlineLength / 2} to ${publicCenterlineLength} centerline meters`);
+    console.log(`\t${publicLaneLength} lane meters`);
+    console.log("Service roads:");
+    console.log(`\t${alleyLength} meters of alleys`);
+    console.log(`\t${drivewayLength} meters of driveways`);
+    console.log(`\t${parkingAisleLength} meters of parking aisles`);
+    console.log(`\t${driveThroughLength} meters of drive-throughs`);
+    console.log("All roadways:");
+    console.log(`\tFrom ${centerlineLength - onewayCenterlineLength / 2} to ${centerlineLength} centerline meters`);
+    console.log(`\t${laneLength} lane meters`);
+    console.log("Pedestrian paths:");
+    console.log(`\t${hallwayLength} meters of hallways`);
+    console.log(`\t${crossingLength} meters of crosswalks`);
+    console.log(`\t${sidewalkLength} meters of sidewalks`);
+    console.log(`\t${stairLength} meters of stairs`);
+    console.log(`\t${footPathLength} meters of other footpaths`);
+    console.log(`\t${hallwayLength + crossingLength + sidewalkLength + stairLength + footPathLength} total meters of footpaths`);
+    console.log("Bike paths:");
+    console.log(`\t${bikePathLength} meters of dedicated bike paths`);
+    console.log(`\t${bikeLaneLength} meters of bike lanes`);
+    console.log(`\t${sharrowLength} meters of sharrows`);
+    console.log("Attributes:");
+    console.log(`\t${turnLaneLength} meters of turn lanes`);
+    console.log(`\t${maximumSpeedLimitLength} meters of speed limits`);
+    console.log(lengthsByRoadClass);
+    console.log(speedLimitLengthsByRoadClass);
+});
