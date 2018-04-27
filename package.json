@@ -16,7 +16,7 @@
     },
     "dependencies": {
         "@turf/turf": "^5.0.0",
-        "lodash": "^4.17.4",
+        "lodash": "^4.17.10",
         "osmium": "^0.5.6"
     }
 }
