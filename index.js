@@ -156,6 +156,9 @@ let maximumSpeedLimitLength = 0;
 let lengthsByRoadClass = {};
 let speedLimitLengthsByRoadClass = {};
 
+let numBridges = 0;
+let bridgeLength = 0;
+
 reader = new osmium.Reader(file, locationHandler, { node: true, way: true, relation: false });
 let filter = new osmium.Filter();
 filter.with_ways("highway", "motorway");
@@ -183,6 +186,7 @@ filter.with_ways("highway", "steps");
 filter.with_ways("highway", "cycleway");
 
 let stream = new osmium.Stream(reader, filter);
+let bridgeWayIDsByNodeID = {};
 stream.on("data", way => {
     let feature = way.geojson();
     let length = turf.length(feature, {
@@ -322,6 +326,17 @@ stream.on("data", way => {
         }
         speedLimitLengthsByRoadClass[tags.highway] += length;
     }
+    
+    if (tags.bridge && tags.bridge !== "no") {
+        let firstNodeID = way.node_refs(0);
+        let lastNodeID = way.node_refs(way.nodes_count - 1);
+        if (!(firstNodeID in bridgeWayIDsByNodeID) && !(lastNodeID in bridgeWayIDsByNodeID)) {
+            numBridges++;
+        }
+        bridgeWayIDsByNodeID[firstNodeID] = way.id;
+        bridgeWayIDsByNodeID[lastNodeID] = way.id;
+        bridgeLength += length;
+    }
 });
 stream.on("end", () => {
     console.log("----");
@@ -364,4 +379,6 @@ stream.on("end", () => {
     console.log(`\t${maximumSpeedLimitLength} meters of speed limits`);
     console.log(lengthsByRoadClass);
     console.log(speedLimitLengthsByRoadClass);
+    console.log(`\t${numBridges} bridges`);
+    console.log(`\t${bridgeLength} meters of bridges`);
 });
