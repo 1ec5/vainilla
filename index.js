@@ -381,4 +381,29 @@ stream.on("end", () => {
     console.log(speedLimitLengthsByRoadClass);
     console.log(`\t${numBridges} bridges`);
     console.log(`\t${bridgeLength} meters of bridges`);
+    
+    reader.close();
+    
+    let railReader = new osmium.Reader(file, locationHandler, { node: true, way: true, relation: false });
+    let filter = new osmium.Filter();
+    filter.with_ways("railway");
+    
+    let railwayLength = 0;
+    
+    let stream = new osmium.Stream(railReader, filter);
+    stream.on("data", way => {
+        let feature = way.geojson();
+        let length = turf.length(feature, {
+            units: "meters"
+        });
+        
+        railwayLength += length;
+    });
+    
+    stream.on("end", () => {
+        console.log("----");
+        
+        console.log("Railways:");
+        console.log(`\t${railwayLength} meters of railroad`);
+    });
 });
