@@ -89,27 +89,50 @@ let handler = new osmium.Handler();
 let buildingCount = 0;
 let buildingCoverArea = 0;
 
+let farmCount = 0;
+let farmlandArea = 0;
+
 handler.on("area", area => {
     let building = area.tags("building");
-    if (!building || building === "no") {
-        return;
+    if (building && building !== "no") {
+        let feature;
+        try {
+            feature = area.geojson();
+        } catch (e) {
+            console.warn("Degenerate area:", area);
+            return;
+        }
+        let squareMeters = turf.area(feature, {
+            units: "meters"
+        });
+        
+        buildingCoverArea += squareMeters;
+        
+        buildingCount++;
+        if (Math.floor(buildingCount / 100000) > Math.floor((buildingCount - 1) / 100000)) {
+            console.log(`${buildingCount} buildings covering ${buildingCoverArea} square meters`);
+        }
     }
-    let feature;
-    try {
-        feature = area.geojson();
-    } catch (e) {
-        console.warn("Degenerate area:", area);
-        return;
-    }
-    let squareMeters = turf.area(feature, {
-        units: "meters"
-    });
     
-    buildingCoverArea += squareMeters;
-    
-    buildingCount++;
-    if (Math.floor(buildingCount / 100000) > Math.floor((buildingCount - 1) / 100000)) {
-        console.log(`${buildingCount} areas covering ${buildingCoverArea} square meters`);
+    let landuse = area.tags("landuse");
+    if (landuse && (landuse === "farm" || landuse === "farmland")) {
+        let feature;
+        try {
+            feature = area.geojson();
+        } catch (e) {
+            console.warn("Degenerate area:", area);
+            return;
+        }
+        let squareMeters = turf.area(feature, {
+            units: "meters"
+        });
+        
+        farmlandArea += squareMeters;
+        
+        farmCount++;
+        if (Math.floor(farmCount / 100000) > Math.floor((farmCount - 1) / 100000)) {
+            console.log(`${farmCount} farms covering ${farmlandArea} square meters`);
+        }
     }
 });
 
@@ -158,6 +181,8 @@ let speedLimitLengthsByRoadClass = {};
 
 let numBridges = 0;
 let bridgeLength = 0;
+
+let tolledLength = 0;
 
 reader = new osmium.Reader(file, locationHandler, { node: true, way: true, relation: false });
 let filter = new osmium.Filter();
@@ -337,12 +362,18 @@ stream.on("data", way => {
         bridgeWayIDsByNodeID[lastNodeID] = way.id;
         bridgeLength += length;
     }
+    
+    if (tags.toll && tags.toll !== "no") {
+        tolledLength += length;
+    }
 });
 stream.on("end", () => {
     console.log("----");
     
     console.log("Buildings:");
     console.log(`\t${buildingCount} buildings covering ${buildingCoverArea} square meters`);
+    console.log("Land use:");
+    console.log(`\t${farmCount} farms covering ${farmlandArea} square meters`);
     
     console.log("----");
     
@@ -380,15 +411,18 @@ stream.on("end", () => {
     console.log(lengthsByRoadClass);
     console.log(speedLimitLengthsByRoadClass);
     console.log(`\t${numBridges} bridges`);
-    console.log(`\t${bridgeLength} meters of bridges`);
+    console.log(`\t${bridgeLength} meters of road bridges`);
+    console.log(`\t${tolledLength} meters of toll roads`);
     
     reader.close();
     
     let railReader = new osmium.Reader(file, locationHandler, { node: true, way: true, relation: false });
     let filter = new osmium.Filter();
     filter.with_ways("railway");
+    filter.with_ways("man_made", "pipeline");
     
     let railwayLength = 0;
+    let pipelineLength = 0;
     
     let stream = new osmium.Stream(railReader, filter);
     stream.on("data", way => {
@@ -397,7 +431,11 @@ stream.on("end", () => {
             units: "meters"
         });
         
-        railwayLength += length;
+        if (way.tags("railway")) {
+            railwayLength += length;
+        } else if (way.tags("man_made") === "pipeline") {
+            pipelineLength += length;
+        }
     });
     
     stream.on("end", () => {
@@ -405,5 +443,7 @@ stream.on("end", () => {
         
         console.log("Railways:");
         console.log(`\t${railwayLength} meters of railroad`);
+        console.log("Pipelines:");
+        console.log(`\t${pipelineLength} meters of pipeline`);
     });
 });
