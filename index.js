@@ -1,5 +1,6 @@
 "use strict";
 
+let _ = require("lodash");
 let osmium = require("osmium");
 let turf = require("@turf/turf");
 
@@ -184,6 +185,8 @@ let bridgeLength = 0;
 
 let tolledLength = 0;
 
+let numLoops = 0;
+
 reader = new osmium.Reader(file, locationHandler, { node: true, way: true, relation: false });
 let filter = new osmium.Filter();
 filter.with_ways("highway", "motorway");
@@ -366,6 +369,31 @@ stream.on("data", way => {
     if (tags.toll && tags.toll !== "no") {
         tolledLength += length;
     }
+    
+    if (tags.junction !== "roundabout" && !_.isEqual(feature.coordinates[0], _.last(feature.coordinates))) {
+        try {
+            let loops = turf.polygonize(feature).features.filter(function (polygonFeature) {
+                let centroid = turf.centroid(polygonFeature);
+                let loop = turf.polygonToLine(polygonFeature);
+                // A cul-de-sac center radius is between 30 and 120 feet. On
+                // either side is a lane, which is about 15 feet wide.
+                // http://www.virginiadot.org/business/resources/appendb.pdf#page=19
+                // At some point the loop becomes so elongated that it isn't
+                // really a cul-de-sac.
+                // A cul-de-sac island becomes mandatory at a radius of 80 feet.
+                // http://www.ci.seatac.wa.us/home/showdocument?id=14625#page=9
+                let radius = turf.pointToLineDistance(centroid, loop, {
+                    units: "feet"
+                });
+                return radius <= 80 && !turf.getCoords(loop).some(coord => turf.distance(centroid, turf.point(coord), {
+                    units: "feet"
+                }) > 120);
+            });
+            numLoops += loops.length;
+        } catch (e) {
+            console.log(`Error detecting loops in way ${way.id}: ${e}`);
+        }
+    }
 });
 stream.on("end", () => {
     console.log("----");
@@ -413,6 +441,7 @@ stream.on("end", () => {
     console.log(`\t${numBridges} bridges`);
     console.log(`\t${bridgeLength} meters of road bridges`);
     console.log(`\t${tolledLength} meters of toll roads`);
+    console.log(`\t${numLoops} loop streets`);
     
     reader.close();
     
